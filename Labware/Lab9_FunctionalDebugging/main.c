@@ -64,35 +64,50 @@ void SysTick_Init(void){
   NVIC_ST_CTRL_R = 0x00000005;          // enable SysTick with core clock
 }
 unsigned long Led;
+unsigned long SW1,SW2;  // input from PF4,PF0
 void Delay(void){unsigned long volatile time;
-  time = 160000; // 0.1sec
+  time = 80000; // 0.1sec
   while(time){
    time--;
   }
 }
 // first data point is wrong, the other 49 will be correct
-unsigned long Time[50];
+//unsigned long Time[50];
 // you must leave the Data array defined exactly as it is
 unsigned long Data[50];
-int main(void){  unsigned long i,last,now;
-  TExaS_Init(SW_PIN_PF40, LED_PIN_PF1);  // activate grader and set system clock to 16 MHz
+
+int main(void) { unsigned long i,last,now;
+	TExaS_Init(SW_PIN_PF40, LED_PIN_PF1);
+	
   PortF_Init();   // initialize PF1 to output
   SysTick_Init(); // initialize SysTick, runs at 16 MHz
   i = 0;          // array index
-  last = NVIC_ST_CURRENT_R;
+  last = GPIO_PORTF_DATA_R&0x013;
   EnableInterrupts();           // enable interrupts for the grader
-  while(1){
-    Led = GPIO_PORTF_DATA_R;   // read previous
-    Led = Led^0x02;            // toggle red LED
-    GPIO_PORTF_DATA_R = Led;   // output 
-    if(i<50){
-      now = NVIC_ST_CURRENT_R;
-      Time[i] = (last-now)&0x00FFFFFF;  // 24-bit time difference
-      Data[i] = GPIO_PORTF_DATA_R&0x02; // record PF1
-      last = now;
-      i++;
-    }
-    Delay();
+  
+	
+	while(1){
+		SW1 = GPIO_PORTF_DATA_R&0x10;     // read PF4 into SW1
+		SW2 = GPIO_PORTF_DATA_R&0x01;     // read PF0 into SW2
+		Led = GPIO_PORTF_DATA_R;   // read previous
+		
+		if((SW1 == 0x00) || (SW2 == 0x00)) {
+			Led = Led^0x02;            // toggle red LED
+			GPIO_PORTF_DATA_R = Led;   // output
+			now = GPIO_PORTF_DATA_R&0x013;
+			
+			if(i<50 && now != last){
+				//Time[i] = (last-now)&0x00FFFFFF;  // 24-bit time difference
+				Data[i] = GPIO_PORTF_DATA_R&0x013; // record PF1
+				last = now;
+			}
+			i++;
+		}
+		else {
+			Led = Led & ~0x2; // Turn on Bit 2
+			GPIO_PORTF_DATA_R = Led; //Set PORTF on
+		}
+		Delay();
   }
 }
 
